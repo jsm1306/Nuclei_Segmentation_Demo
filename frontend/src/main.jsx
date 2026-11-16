@@ -1,217 +1,28 @@
 import React, { useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { predictImage } from "./api";
+import { batchZipUrl, fetchHealth, masksZipUrl, predictImage } from "./api";
 import "./styles.css";
 
-const MAX_FILE_SIZE = 20 * 1024 * 1024;
-const ACCEPTED_TYPES = ["image/png", "image/jpeg"];
-
-function UploadIcon() {
-  return (
-    <svg aria-hidden="true" viewBox="0 0 24 24" className="upload-icon">
-      <path d="M12 16V4m0 0L7.5 8.5M12 4l4.5 4.5M5 14v4a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-4" />
-    </svg>
-  );
-}
-
+const MAX = 20 * 1024 * 1024, TYPES = ["image/png", "image/jpeg"];
 function App() {
-  const inputRef = useRef(null);
-  const [file, setFile] = useState(null);
-  const [previewUrl, setPreviewUrl] = useState("");
-  const [results, setResults] = useState(null);
-  const [isDragging, setIsDragging] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState("");
-
-  useEffect(() => {
-    return () => {
-      if (previewUrl) URL.revokeObjectURL(previewUrl);
-    };
-  }, [previewUrl]);
-
-  function selectFile(nextFile) {
-    setError("");
-    setResults(null);
-    if (!nextFile) return;
-    if (!ACCEPTED_TYPES.includes(nextFile.type)) {
-      setError("Choose a PNG or JPG/JPEG microscopy image.");
-      return;
-    }
-    if (nextFile.size > MAX_FILE_SIZE) {
-      setError("The image must be smaller than 20 MB.");
-      return;
-    }
-    const nextPreview = URL.createObjectURL(nextFile);
-    setFile(nextFile);
-    setPreviewUrl((previous) => {
-      if (previous) URL.revokeObjectURL(previous);
-      return nextPreview;
-    });
-  }
-
-  function removeFile() {
-    setFile(null);
-    setResults(null);
-    setError("");
-    if (inputRef.current) inputRef.current.value = "";
-    setPreviewUrl((previous) => {
-      if (previous) URL.revokeObjectURL(previous);
-      return "";
-    });
-  }
-
-  async function runPrediction() {
-    if (!file || isLoading) return;
-    setError("");
-    setIsLoading(true);
-    try {
-      setResults(await predictImage(file));
-    } catch (requestError) {
-      setError(requestError.message);
-    } finally {
-      setIsLoading(false);
-    }
-  }
-
-  function handleDrop(event) {
-    event.preventDefault();
-    setIsDragging(false);
-    selectFile(event.dataTransfer.files[0]);
-  }
-
-  return (
-    <div className="app-shell">
-      <header className="site-header">
-        <a className="brand" href="/" aria-label="NuRAFormer home">
-          <span className="brand-mark">N</span>
-          <span>NuRAFormer</span>
-        </a>
-        <span className="header-note">Research demonstration</span>
-      </header>
-
-      <main>
-        <section className="intro-section">
-          <div className="intro-copy">
-            <p className="eyebrow">Computational microscopy</p>
-            <h1>See nuclei boundaries with greater clarity.</h1>
-            <p className="intro-text">
-              A live demonstration of NuRAFormer, a hybrid UNet–Transformer
-              model for nuclei segmentation and boundary-aware analysis.
-            </p>
-          </div>
-          <div className="model-note" aria-label="Model details">
-            <span className="model-note-dot" />
-            <div>
-              <strong>Two-head inference</strong>
-              <span>Segmentation + boundary maps</span>
-            </div>
-          </div>
-        </section>
-
-        <section className="workspace-section" aria-labelledby="workspace-title">
-          <div className="section-heading">
-            <div>
-              <p className="eyebrow">Image testing</p>
-              <h2 id="workspace-title">Upload a microscopy image</h2>
-            </div>
-            <p className="section-support">PNG or JPG · resized to 512 × 512 for inference</p>
-          </div>
-
-          <div
-            className={`upload-zone ${isDragging ? "is-dragging" : ""} ${file ? "has-file" : ""}`}
-            onDragEnter={(event) => {
-              event.preventDefault();
-              setIsDragging(true);
-            }}
-            onDragOver={(event) => event.preventDefault()}
-            onDragLeave={() => setIsDragging(false)}
-            onDrop={handleDrop}
-          >
-            {!file ? (
-              <>
-                <span className="upload-icon-wrap"><UploadIcon /></span>
-                <h3>Drop an image here</h3>
-                <p>or browse from your computer</p>
-                <button className="button button-secondary" onClick={() => inputRef.current?.click()}>
-                  Browse files
-                </button>
-                <input
-                  ref={inputRef}
-                  className="visually-hidden"
-                  type="file"
-                  accept=".png,.jpg,.jpeg,image/png,image/jpeg"
-                  onChange={(event) => selectFile(event.target.files[0])}
-                />
-              </>
-            ) : (
-              <div className="selected-file">
-                <div className="selected-preview">
-                  <img src={previewUrl} alt="Selected microscopy image preview" />
-                </div>
-                <div className="selected-details">
-                  <p className="file-kicker">Selected image</p>
-                  <h3>{file.name}</h3>
-                  <p>{(file.size / 1024).toFixed(1)} KB · Ready for prediction</p>
-                  <button className="text-button" onClick={removeFile}>Remove image</button>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {error && <div className="message message-error" role="alert">{error}</div>}
-
-          <div className="action-row">
-            <button className="button button-primary" disabled={!file || isLoading} onClick={runPrediction}>
-              {isLoading ? <><span className="spinner" /> Running inference…</> : "Run prediction"}
-            </button>
-            {file && !isLoading && <button className="text-button reset-button" onClick={removeFile}>Reset</button>}
-          </div>
-        </section>
-
-        <section className="results-section" aria-labelledby="results-title">
-          <div className="section-heading results-heading">
-            <div>
-              <p className="eyebrow">Model output</p>
-              <h2 id="results-title">Prediction results</h2>
-            </div>
-            {!results && <p className="section-support">Your masks will appear here after inference.</p>}
-            {results && <p className="result-status"><span /> Generated at 0.5 threshold</p>}
-          </div>
-
-          {!results ? (
-            <div className="empty-results">
-              <div className="empty-line" />
-              <p>Upload an image to inspect its segmentation and boundary maps.</p>
-            </div>
-          ) : (
-            <div className="result-grid">
-              <ResultCard label="Processed input · 512 × 512" src={results.original_image} />
-              <ResultCard label="Nuclei segmentation mask" src={results.segmentation_mask} />
-              <ResultCard label="Nuclei boundary mask" src={results.boundary_mask} />
-            </div>
-          )}
-        </section>
-      </main>
-
-      <footer className="site-footer">
-        <span>NuRAFormer</span>
-        <span>Hybrid UNet–Transformer research project</span>
-      </footer>
-    </div>
-  );
+  const inputRef = useRef(null), [mode, setMode] = useState("single"), [file, setFile] = useState(null), [preview, setPreview] = useState(""), [meta, setMeta] = useState(null), [results, setResults] = useState(null), [health, setHealth] = useState(null), [timing, setTiming] = useState(null), [loading, setLoading] = useState(false), [error, setError] = useState("");
+  const [dark, setDark] = useState(() => localStorage.getItem("nuraformer-theme") === "dark"), [batchFiles, setBatchFiles] = useState([]), [batchItems, setBatchItems] = useState([]), [batchRunning, setBatchRunning] = useState(false), [batchSelected, setBatchSelected] = useState(null), [batchError, setBatchError] = useState("");
+  useEffect(() => { document.documentElement.dataset.theme = dark ? "dark" : "light"; localStorage.setItem("nuraformer-theme", dark ? "dark" : "light"); }, [dark]); useEffect(() => { fetchHealth().then(setHealth).catch(() => {}); }, []); useEffect(() => () => preview && URL.revokeObjectURL(preview), [preview]);
+  function selectFile(next) { setError(""); if (!next) return; if (!TYPES.includes(next.type)) return setError("Choose a PNG or JPG/JPEG microscopy image."); if (next.size > MAX) return setError("The image must be smaller than 20 MB."); const url = URL.createObjectURL(next), image = new Image(); image.onload = () => setMeta({ width: image.naturalWidth, height: image.naturalHeight }); image.src = url; setFile(next); setResults(null); setPreview((old) => { if (old) URL.revokeObjectURL(old); return url; }); }
+  function reset() { setFile(null); setResults(null); setTiming(null); setMeta(null); setError(""); if (inputRef.current) inputRef.current.value = ""; setPreview((old) => { if (old) URL.revokeObjectURL(old); return ""; }); }
+  async function runPrediction() { if (!file || loading) return; const started = performance.now(); setLoading(true); setError(""); try { const result = await predictImage(file); setResults(result); setTiming(performance.now() - started); } catch (e) { setError(e.message); } finally { setLoading(false); } }
+  function addBatchFiles(files) { const invalid = Array.from(files || []).filter((item) => !TYPES.includes(item.type) || item.size > MAX); if (invalid.length) setBatchError(`${invalid.length} file(s) rejected. Use PNG/JPG/JPEG under 20 MB each.`); const valid = Array.from(files || []).filter((item) => TYPES.includes(item.type) && item.size <= MAX); setBatchFiles((old) => { const seen = new Set(old.map((item) => `${item.name}:${item.size}`)); return [...old, ...valid.filter((item) => !seen.has(`${item.name}:${item.size}`))]; }); }
+  function removeBatch(key) { setBatchFiles((old) => old.filter((item) => `${item.name}:${item.size}` !== key)); }
+  async function runBatch() { if (!batchFiles.length || batchRunning) return; setBatchRunning(true); setBatchError(""); const items = batchFiles.map((item) => ({ file: item, status: "waiting", result: null, error: "" })); setBatchItems(items); for (let i = 0; i < items.length; i += 1) { setBatchItems((old) => old.map((item, index) => index === i ? { ...item, status: "processing" } : item)); try { const result = await predictImage(items[i].file); setBatchItems((old) => old.map((item, index) => index === i ? { ...item, status: "completed", result } : item)); if (!batchSelected) setBatchSelected(result); } catch (e) { setBatchItems((old) => old.map((item, index) => index === i ? { ...item, status: "failed", error: e.message } : item)); } } setBatchRunning(false); }
+  function download(src, name) { if (!src) return; const a = document.createElement("a"); a.href = src; a.download = name; a.click(); }
+  const shown = mode === "batch" ? batchSelected : results, base = (file?.name || "nuraformer").replace(/\.[^.]+$/, ""), completed = batchItems.filter((item) => item.status === "completed");
+  return <div className="app-shell"><header className="topbar"><a className="brand" href="/" aria-label="NuRAFormer home"><span className="brand-mark">N</span><span>NuRAFormer</span></a><div className="nav-meta"><span>Research demonstration</span><button className="theme-toggle" onClick={() => setDark(!dark)}>{dark ? "☼ Light" : "◐ Dark"}</button></div></header><main><section className="app-heading"><div><p className="context-label">Computational microscopy</p><h1>Nuclei Segmentation Workbench</h1><p>Two-head inference for nuclei regions and learned boundaries.</p></div><span className="ready-state"><i /> 512 × 512 input</span></section><div className="mode-tabs main-tabs"><button className={mode === "single" ? "active" : ""} onClick={() => setMode("single")}>Single Image</button><button className={mode === "batch" ? "active" : ""} onClick={() => setMode("batch")}>Batch Analysis</button></div>{mode === "single" ? <SingleWorkspace file={file} preview={preview} meta={meta} results={results} loading={loading} error={error} inputRef={inputRef} selectFile={selectFile} reset={reset} runPrediction={runPrediction} download={download} base={base} health={health} timing={timing} /> : <BatchWorkspace batchFiles={batchFiles} batchItems={batchItems} batchRunning={batchRunning} batchSelected={batchSelected} completed={completed} batchError={batchError} addBatchFiles={addBatchFiles} removeBatch={removeBatch} runBatch={runBatch} setBatchSelected={setBatchSelected} download={download} />}</main><footer className="footer"><span>NuRAFormer</span><span>Hybrid U-Net–Transformer with reverse attention and boundary-aware learning</span></footer></div>;
 }
-
-function ResultCard({ label, src }) {
-  return (
-    <figure className="result-card">
-      <div className="result-image-wrap">
-        <img src={src} alt={label} />
-      </div>
-      <figcaption>{label}</figcaption>
-    </figure>
-  );
-}
-
-createRoot(document.getElementById("root")).render(
-  <React.StrictMode><App /></React.StrictMode>,
-);
+function SingleWorkspace({ file, preview, meta, results, loading, error, inputRef, selectFile, reset, runPrediction, download, base, health, timing }) { return <section className="workbench"><div className="section-head"><h2>Analyze an image</h2><span>PNG · JPG · JPEG · max 20 MB</span></div><div className="controls-bar"><div className="upload-controls"><div className="drop-copy"><h3>{file ? file.name : "Upload a microscopy image"}</h3><p>{file ? `Original ${meta?.width || "?"} × ${meta?.height || "?"}px · processed 512 × 512 · ${(file.size / 1024).toFixed(1)} KB` : "Drop a file here or browse from your computer"}</p></div><button className="button secondary" onClick={() => inputRef.current?.click()}>Browse files</button><input ref={inputRef} className="visually-hidden" type="file" accept=".png,.jpg,.jpeg,image/png,image/jpeg" onChange={(e) => selectFile(e.target.files[0])} /></div><div className="pane-actions"><button className="button primary" disabled={!file || loading} onClick={runPrediction}>{loading ? "Running inference…" : "Run prediction"}</button>{file && <button className="link-button" onClick={reset}>Reset</button>}</div>{error && <div className="error" role="alert">{error}</div>}</div><ComparisonWorkspace results={results} loading={loading} download={download} base={base} /><Performance results={results} health={health} timing={timing} /></section>; }
+function BatchWorkspace({ batchFiles, batchItems, batchRunning, batchSelected, completed, batchError, addBatchFiles, removeBatch, runBatch, setBatchSelected, download }) { const input = useRef(null), completedIds = completed.map((item) => item.result.prediction_id); return <section className="workbench"><div className="section-head"><h2>Batch analysis</h2><span>{batchFiles.length} selected · sequential inference</span></div><div className="controls-bar batch-controls"><div className="upload-controls"><div className="drop-copy"><h3>Select multiple microscopy images</h3><p>PNG/JPG/JPEG · max 20 MB per file · duplicates are ignored</p></div><button className="button secondary" onClick={() => input.current?.click()}>Add images</button><input ref={input} className="visually-hidden" type="file" multiple accept=".png,.jpg,.jpeg,image/png,image/jpeg" onChange={(e) => addBatchFiles(e.target.files)} /></div><div className="pane-actions"><button className="button primary" disabled={!batchFiles.length || batchRunning} onClick={runBatch}>{batchRunning ? "Processing batch…" : "Run batch prediction"}</button><button className="link-button" onClick={() => batchFiles.forEach((item) => removeBatch(`${item.name}:${item.size}`))}>Clear all</button></div>{batchError && <div className="error" role="alert">{batchError}</div>}</div><div className="batch-queue">{batchFiles.map((item) => { const status = batchItems.find((entry) => entry.file === item)?.status || "waiting"; return <div className="queue-item" key={`${item.name}:${item.size}`}><strong>{item.name}</strong><span>{(item.size / 1024).toFixed(1)} KB</span><em>{status}</em><button className="link-button" onClick={() => removeBatch(`${item.name}:${item.size}`)}>Remove</button></div>; })}</div>{batchItems.length > 0 && <p className="batch-summary">Completed {completed.length} / {batchItems.length} · Processing {batchItems.filter((item) => item.status === "processing").length} · Failed {batchItems.filter((item) => item.status === "failed").length}</p>}{completed.length > 0 && <div className="batch-results-list">{completed.map((item, index) => <BatchResultRow key={item.result.prediction_id} item={item} index={index} download={download} />)}</div>}{completed.length > 0 && <a className="zip-button" href={batchZipUrl(completedIds)} download="NuRAFormer_Batch_Results.zip">Download all completed results as ZIP <span>{completed.length} images</span></a>}</section>; }
+function ComparisonWorkspace({ results, loading, download, base }) { return <div className="comparison-workspace"><div className="comparison-heading"><h3>Prediction comparison</h3><span>{loading ? "Processing" : results ? `Threshold ${results.threshold}` : "Run prediction to populate all three canvases"}</span></div>{loading ? <div className="comparison-empty"><div className="loading-mark" /><p>Running NuRAFormer inference…</p></div> : results ? <><div className="comparison-grid"><ComparisonCanvas label="Processed input" src={results.original_image} /><ComparisonCanvas label="Segmentation mask" src={results.segmentation_mask} onDownload={() => download(results.segmentation_mask, `${base}_segmentation_mask.png`)} /><ComparisonCanvas label="Boundary mask" src={results.boundary_mask} onDownload={() => download(results.boundary_mask, `${base}_boundary_mask.png`)} /></div><a className="zip-button" href={masksZipUrl(results.prediction_id)} download={`${base}_masks.zip`}>Download both masks as ZIP <span>2 PNG files</span></a></> : <div className="comparison-empty"><div className="empty-glyph">◇</div><p>Processed input, segmentation mask, and boundary mask will appear here.</p></div>}</div>; }
+function ComparisonCanvas({ label, src, onDownload }) { return <figure className="comparison-canvas"><div><img src={src} alt={label} /></div><figcaption><span>{label} · 512 × 512</span>{onDownload && <button onClick={onDownload}>Download PNG</button>}</figcaption></figure>; }
+function BatchResultRow({ item, index, download }) { const stem = item.file.name.replace(/\.[^.]+$/, ""); return <article className="batch-result-row"><div className="batch-result-heading"><h3>{index + 1}. {item.file.name}</h3><span>Completed · threshold {item.result.threshold}</span></div><div className="comparison-grid"><ComparisonCanvas label="Processed input" src={item.result.original_image} /><ComparisonCanvas label="Segmentation mask" src={item.result.segmentation_mask} onDownload={() => download(item.result.segmentation_mask, `${stem}_segmentation_mask.png`)} /><ComparisonCanvas label="Boundary mask" src={item.result.boundary_mask} onDownload={() => download(item.result.boundary_mask, `${stem}_boundary_mask.png`)} /></div><a className="zip-button" href={masksZipUrl(item.result.prediction_id)} download={`${stem}_masks.zip`}>Download this image’s masks as ZIP <span>2 PNG files</span></a></article>; }
+function Performance({ results, health, timing }) { return <div className="info-grid lower-section"><div><SectionTitle title="Inference performance" note="Measured milliseconds." /><div className="metric-list">{[["Model initialization", health?.model_initialization_ms], ["Image preprocessing", results?.timings?.preprocessing_ms], ["Model forward pass", results?.timings?.inference_ms], ["Postprocessing", results?.timings?.postprocessing_ms], ["Backend total request", results?.timings?.total_request_ms], ["End-to-end UI response", timing]].map(([label, value]) => <div className="metric" key={label}><span>{label}</span><strong>{typeof value === "number" ? `${value.toFixed(2)} ms` : "Not available"}</strong></div>)}</div></div><div><SectionTitle title="Model information" note="Verified architecture details." /><dl className="model-list"><dt>Model</dt><dd>NuRAFormer</dd><dt>Architecture</dt><dd>Hybrid U-Net–Transformer</dd><dt>Encoder</dt><dd>MobileNetV2</dd><dt>Heads</dt><dd>Segmentation · boundary</dd><dt>Input / size</dt><dd>512 × 512 · approx. 78 MB</dd></dl></div></div>; }
+function SectionTitle({ title, note }) { return <div className="section-title"><h2>{title}</h2><p>{note}</p></div>; }
+createRoot(document.getElementById("root")).render(<React.StrictMode><App /></React.StrictMode>);

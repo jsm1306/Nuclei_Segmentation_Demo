@@ -39,3 +39,17 @@ export async function predictImage(file) {
   }
   return body;
 }
+
+export async function fetchHealth() {
+  const response = await fetch(`${API_BASE_URL}/health`);
+  if (!response.ok) throw new Error("The backend health status could not be read.");
+  return response.json();
+}
+
+export function masksZipUrl(predictionId) {
+  return `${API_BASE_URL}/predictions/${encodeURIComponent(predictionId)}/masks.zip`;
+}
+
+export function batchZipUrl(predictionIds) {
+  return `${API_BASE_URL}/predictions/batch.zip?prediction_ids=${encodeURIComponent(predictionIds.join(","))}`;
+}

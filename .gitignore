@@ -36,3 +36,6 @@ htmlcov/
 
 # Python build metadata
 *.egg-info/
+weights/best_fold_3.weights.h5
+.agents/
+.impeccable/
