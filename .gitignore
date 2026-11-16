@@ -1,0 +1,38 @@
+frontend/node_modules
+frontend/dist
+.history/
+Images/
+**/.ipynb_checkpoints/
+Nuclei_Seg_FinalizedModel_Specs.ipynb
+# OS/editor files
+.DS_Store
+Thumbs.db
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Python testing and tooling cache
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# Local tooling and generated reports
+.coverage
+htmlcov/
+*.log
+*.tmp
+*.bak
+
+# Python build metadata
+*.egg-info/
