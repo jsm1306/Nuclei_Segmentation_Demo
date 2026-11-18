@@ -39,10 +39,7 @@ logger = logging.getLogger("nuraformer")
 async def lifespan(_: FastAPI):
     global model, model_error, onnx_session, model_initialization_ms, execution_device
     started = time.perf_counter()
-    weights_path = Path(os.getenv("NURAFORMER_WEIGHTS", str(DEFAULT_WEIGHTS)))
     try:
-        if not weights_path.is_file():
-            raise FileNotFoundError(f"Model weights not found: {weights_path}")
         onnx_path = Path(os.getenv("NURAFORMER_ONNX", str(DEFAULT_ONNX)))
         if onnx_path.is_file():
             import onnxruntime as ort
@@ -51,6 +48,9 @@ async def lifespan(_: FastAPI):
             execution_device = "CPUExecutionProvider"
             logger.info("Using ONNX Runtime model from %s", onnx_path)
         else:
+            weights_path = Path(os.getenv("NURAFORMER_WEIGHTS", str(DEFAULT_WEIGHTS)))
+            if not weights_path.is_file():
+                raise FileNotFoundError(f"Model weights not found: {weights_path}")
             model = load_model(str(weights_path))
             execution_device = "TensorFlow runtime"
         logger.info("Warming up NuRAFormer inference graph")
