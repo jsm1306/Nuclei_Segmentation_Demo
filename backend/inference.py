@@ -3,10 +3,13 @@ from __future__ import annotations
 import base64
 import io
 from dataclasses import dataclass
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
-import tensorflow as tf
 from PIL import Image, UnidentifiedImageError
+
+if TYPE_CHECKING:
+    import tensorflow as tf
 
 IMAGE_SIZE = (512, 512)
 ALLOWED_FORMATS = {"PNG", "JPEG"}
@@ -58,7 +61,7 @@ def _validate_output(name: str, output: object) -> np.ndarray:
     return np.clip(array[0, :, :, 0], 0.0, 1.0)
 
 
-def predict(model: tf.keras.Model, prepared: PreparedImage) -> tuple[np.ndarray, np.ndarray]:
+def predict(model: Any, prepared: PreparedImage) -> tuple[np.ndarray, np.ndarray]:
     outputs = model(prepared.model_input, training=False)
     if not isinstance(outputs, (list, tuple)) or len(outputs) != 2:
         raise RuntimeError("The model must return segmentation and boundary outputs.")

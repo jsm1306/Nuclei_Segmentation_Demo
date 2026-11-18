@@ -9,24 +9,23 @@ import uuid
 import zipfile
 from contextlib import asynccontextmanager
 from pathlib import Path
+from typing import Any
 
 os.environ.setdefault("TF_NUM_INTRAOP_THREADS", "1")
 os.environ.setdefault("TF_NUM_INTEROP_THREADS", "1")
 
 import numpy as np
-import tensorflow as tf
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 
 from .inference import InvalidImageError, encode_bytes, encode_png, predict, predict_onnx, prepare_image
-from .model import load_model
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_WEIGHTS = ROOT / "weights" / "best_fold_3.weights.h5"
 DEFAULT_ONNX = ROOT / "weights" / "nuraformer_fp32.onnx"
 MAX_UPLOAD_BYTES = 20 * 1024 * 1024
-model: tf.keras.Model | None = None
+model: Any = None
 model_error: str | None = None
 onnx_session = None
 model_initialization_ms: float | None = None
@@ -51,6 +50,8 @@ async def lifespan(_: FastAPI):
             weights_path = Path(os.getenv("NURAFORMER_WEIGHTS", str(DEFAULT_WEIGHTS)))
             if not weights_path.is_file():
                 raise FileNotFoundError(f"Model weights not found: {weights_path}")
+            from .model import load_model
+
             model = load_model(str(weights_path))
             execution_device = "TensorFlow runtime"
         logger.info("Warming up NuRAFormer inference graph")
